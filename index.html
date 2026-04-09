@@ -3,29 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Digital Library | Refined Edition</title>
+    <title>Cloud Library | Premium</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <h1>Cloud Digital Library</h1>
-        <p>Dynamic Book Explorer</p>
+    <header class="hero">
+        <div class="hero-content">
+            <h1>Cloud Digital Library</h1>
+            <p>Explore thousands of titles fetched in real-time from the cloud.</p>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search for books or authors..." onkeyup="searchBooks()">
+            </div>
+        </div>
     </header>
 
-    <main class="container">
-        <aside class="sidebar">
-            <h3>Genres</h3>
-            <ul id="genre-list">
-                </ul>
-        </aside>
+    <main class="main-layout">
+        <nav class="sidebar">
+            <div class="sidebar-header">Genres</div>
+            <ul id="genre-list"></ul>
+        </nav>
 
-        <section class="content">
-            <div id="loading" class="loading-message">
-                <p>⚡ Fetching books from the Cloud Library... please wait.</p>
+        <section class="content-area">
+            <div id="loading" class="loader">
+                <div class="spinner"></div>
+                <p>Syncing with Cloud Database...</p>
             </div>
             
-            <div id="book-grid" class="book-grid" style="display: none;">
-                </div>
+            <div id="book-grid" class="book-grid"></div>
         </section>
     </main>
 
@@ -38,4 +43,4 @@
 
     <script src="script.js"></script>
 </body>
-</html>
+</html>f
