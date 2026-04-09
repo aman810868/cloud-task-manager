@@ -1,113 +1,99 @@
-// A refined approach to fetching data from a dynamic API
-// (Much better for a Cloud Computing PBL)
-
-const genres = ['fiction', 'sci-fi', 'mystery', 'non-fiction', 'fantasy'];
-let currentBooks = []; // This will hold the current list
+const genres = ['fiction', 'science_fiction', 'mystery', 'history', 'fantasy'];
 
 async function fetchBooksByGenre(genre) {
     showLoading(true);
+    const grid = document.getElementById('book-grid');
+    grid.innerHTML = ''; 
+
     try {
-        const response = await fetch(`https://openlibrary.org/subjects/${genre}.json?limit=20&details=true`);
+        // Updated URL to use underscore for science_fiction
+        const response = await fetch(`https://openlibrary.org/subjects/${genre.toLowerCase()}.json?limit=20`);
         const data = await response.json();
         
-        // Open Library data is messy; we must clean it up
-        currentBooks = data.works.map(work => ({
-            title: work.title,
-            author: work.authors[0]?.name || "Unknown Author",
-            coverId: work.cover_id,
-            overview: work.key // We will use the key to fetch the overview when clicked
-        }));
-        
-        displayBooks(currentBooks);
+        if (!data.works || data.works.length === 0) {
+            throw new Error("No books found");
+        }
+
+        data.works.forEach(work => {
+            const card = document.createElement('div');
+            card.className = 'book-card';
+            const coverUrl = work.cover_id 
+                ? `https://covers.openlibrary.org/b/id/${work.cover_id}-L.jpg` 
+                : 'https://via.placeholder.com/200x280?text=No+Cover';
+                
+            card.innerHTML = `
+                <img src="${coverUrl}" alt="${work.title}" onerror="this.src='https://via.placeholder.com/200x280?text=Cover+Error'">
+                <div class="book-info">
+                    <h4>${work.title}</h4>
+                    <p>${work.authors[0]?.name || "Unknown Author"}</p>
+                </div>
+            `;
+            card.onclick = () => showOverview(work);
+            grid.appendChild(card);
+        });
     } catch (error) {
-        console.error("Error fetching books:", error);
-        document.getElementById('loading').innerHTML = "<p>⚠️ Error fetching data. Please try again later.</p>";
+        console.error("Fetch Error:", error);
+        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center;">⚠️ Failed to load books. Please try a different genre.</p>`;
+    } finally {
+        showLoading(false);
     }
 }
 
-function displayBooks(books) {
-    const grid = document.getElementById('book-grid');
-    grid.innerHTML = ''; // Clear the grid
-    
-    books.forEach(book => {
-        const card = document.createElement('div');
-        card.className = 'book-card';
-        
-        // Open Library Cover image URLs follow a simple pattern
-        const coverUrl = book.coverId 
-            ? `https://covers.openlibrary.org/b/id/${book.coverId}-M.jpg` 
-            : 'https://via.placeholder.com/180x250?text=No+Cover';
-            
-        card.innerHTML = `
-            <img src="${coverUrl}" alt="${book.title}">
-            <div class="book-info">
-                <h4>${book.title}</h4>
-                <p>${book.author}</p>
-            </div>
-        `;
-        card.onclick = () => showOverview(book);
-        grid.appendChild(card);
-    });
-    showLoading(false);
-}
-
-// When a user clicks a book, we dynamically fetch the overview description
-async function showOverview(book) {
+async function showOverview(work) {
     const modal = document.getElementById('book-modal');
     const body = document.getElementById('modal-body');
-    
-    body.innerHTML = '<h3>Loading Overview...</h3>';
     modal.style.display = 'block';
+    body.innerHTML = '<h2>Loading description...</h2>';
 
     try {
-        const response = await fetch(`https://openlibrary.org${book.overview}.json`);
+        const response = await fetch(`https://openlibrary.org${work.key}.json`);
         const data = await response.json();
-        const description = data.description || "No overview available for this title.";
+        let description = "No description available for this classic.";
         
-        body.innerHTML = `
-            <h2>${book.title}</h2>
-            <h3>By ${book.author}</h3>
-            <p>${description}</p>
-        `;
-    } catch (error) {
-        body.innerHTML = '<h3>Could not load description.</h3>';
-    }
-}
+        if (typeof data.description === 'string') description = data.description;
+        else if (data.description?.value) description = data.description.value;
 
-function closeModal() {
-    document.getElementById('book-modal').style.display = 'none';
+        body.innerHTML = `
+            <h2>${work.title}</h2>
+            <p style="color: var(--accent); font-weight: bold;">${work.authors[0]?.name}</p>
+            <div style="max-height: 300px; overflow-y: auto; margin-top: 15px;">
+                <p>${description}</p>
+            </div>
+        `;
+    } catch (e) {
+        body.innerHTML = '<h2>Error loading details.</h2>';
+    }
 }
 
 function generateGenreSidebar() {
     const list = document.getElementById('genre-list');
-    genres.forEach(genre => {
+    list.innerHTML = '';
+    genres.forEach((genre, index) => {
         const li = document.createElement('li');
-        li.textContent = genre.charAt(0).toUpperCase() + genre.slice(1);
-        li.onclick = (e) => filterGenre(e, genre);
+        li.textContent = genre.replace('_', ' ').toUpperCase();
+        if (index === 0) li.classList.add('active');
+        li.onclick = (e) => {
+            document.querySelectorAll('.sidebar li').forEach(el => el.classList.remove('active'));
+            li.classList.add('active');
+            fetchBooksByGenre(genre);
+        };
         list.appendChild(li);
     });
-    // Load the first genre by default
-    document.querySelector('#genre-list li').classList.add('active');
     fetchBooksByGenre(genres[0]);
-}
-
-function filterGenre(event, genre) {
-    document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
-    event.target.classList.add('active');
-    fetchBooksByGenre(genre);
 }
 
 function showLoading(isLoading) {
     const loadingDiv = document.getElementById('loading');
     const gridDiv = document.getElementById('book-grid');
-    if (isLoading) {
-        loadingDiv.style.display = 'block';
-        gridDiv.style.display = 'none';
-    } else {
-        loadingDiv.style.display = 'none';
-        gridDiv.style.display = 'grid';
-    }
+    loadingDiv.style.display = isLoading ? 'block' : 'none';
+    gridDiv.style.display = isLoading ? 'none' : 'grid';
 }
 
-// Initialize
+function closeModal() { document.getElementById('book-modal').style.display = 'none'; }
+
+// Close modal when clicking outside of it
+window.onclick = (event) => {
+    if (event.target == document.getElementById('book-modal')) closeModal();
+}
+
 generateGenreSidebar();
