@@ -1,132 +1,113 @@
-// Task Manager Application
-let tasks = [];
+// A refined approach to fetching data from a dynamic API
+// (Much better for a Cloud Computing PBL)
 
-// Load tasks from localStorage
-function loadTasks() {
-    const savedTasks = localStorage.getItem('cloudTasks');
-    if (savedTasks) {
-        tasks = JSON.parse(savedTasks);
-        renderTasks();
-        updateStats();
+const genres = ['fiction', 'sci-fi', 'mystery', 'non-fiction', 'fantasy'];
+let currentBooks = []; // This will hold the current list
+
+async function fetchBooksByGenre(genre) {
+    showLoading(true);
+    try {
+        const response = await fetch(`https://openlibrary.org/subjects/${genre}.json?limit=20&details=true`);
+        const data = await response.json();
+        
+        // Open Library data is messy; we must clean it up
+        currentBooks = data.works.map(work => ({
+            title: work.title,
+            author: work.authors[0]?.name || "Unknown Author",
+            coverId: work.cover_id,
+            overview: work.key // We will use the key to fetch the overview when clicked
+        }));
+        
+        displayBooks(currentBooks);
+    } catch (error) {
+        console.error("Error fetching books:", error);
+        document.getElementById('loading').innerHTML = "<p>⚠️ Error fetching data. Please try again later.</p>";
     }
 }
 
-// Save tasks to localStorage
-function saveTasks() {
-    localStorage.setItem('cloudTasks', JSON.stringify(tasks));
-}
-
-// Add new task
-function addTask() {
-    const taskInput = document.getElementById('taskInput');
-    const taskText = taskInput.value.trim();
-
-    if (taskText === '') {
-        alert('Please enter a task!');
-        return;
-    }
-
-    const task = {
-        id: Date.now(),
-        text: taskText,
-        completed: false,
-        createdAt: new Date().toISOString()
-    };
-
-    tasks.push(task);
-    taskInput.value = '';
+function displayBooks(books) {
+    const grid = document.getElementById('book-grid');
+    grid.innerHTML = ''; // Clear the grid
     
-    saveTasks();
-    renderTasks();
-    updateStats();
-}
-
-// Toggle task completion
-function toggleTask(id) {
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-        task.completed = !task.completed;
-        saveTasks();
-        renderTasks();
-        updateStats();
-    }
-}
-
-// Delete task
-function deleteTask(id) {
-    tasks = tasks.filter(t => t.id !== id);
-    saveTasks();
-    renderTasks();
-    updateStats();
-}
-
-// Render tasks to the DOM
-function renderTasks() {
-    const taskList = document.getElementById('taskList');
-    
-    if (tasks.length === 0) {
-        taskList.innerHTML = '<div class="empty-state">No tasks yet. Add one to get started! 🚀</div>';
-        return;
-    }
-
-    taskList.innerHTML = tasks.map(task => `
-        <li class="task-item ${task.completed ? 'completed' : ''}">
-            <span class="task-text">${task.text}</span>
-            <div class="task-actions">
-                <button class="complete-btn" onclick="toggleTask(${task.id})">
-                    ${task.completed ? '↩️ Undo' : '✓ Done'}
-                </button>
-                <button class="delete-btn" onclick="deleteTask(${task.id})">
-                    🗑️ Delete
-                </button>
+    books.forEach(book => {
+        const card = document.createElement('div');
+        card.className = 'book-card';
+        
+        // Open Library Cover image URLs follow a simple pattern
+        const coverUrl = book.coverId 
+            ? `https://covers.openlibrary.org/b/id/${book.coverId}-M.jpg` 
+            : 'https://via.placeholder.com/180x250?text=No+Cover';
+            
+        card.innerHTML = `
+            <img src="${coverUrl}" alt="${book.title}">
+            <div class="book-info">
+                <h4>${book.title}</h4>
+                <p>${book.author}</p>
             </div>
-        </li>
-    `).join('');
-}
-
-// Update statistics
-function updateStats() {
-    const total = tasks.length;
-    const completed = tasks.filter(t => t.completed).length;
-    const pending = total - completed;
-
-    document.getElementById('totalTasks').textContent = total;
-    document.getElementById('completedTasks').textContent = completed;
-    document.getElementById('pendingTasks').textContent = pending;
-}
-
-// Set deployment date
-function setDeploymentDate() {
-    const date = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        `;
+        card.onclick = () => showOverview(book);
+        grid.appendChild(card);
     });
-    document.getElementById('deployDate').textContent = date;
+    showLoading(false);
 }
 
-// Event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    loadTasks();
-    setDeploymentDate();
-
-    document.getElementById('addTaskBtn').addEventListener('click', addTask);
+// When a user clicks a book, we dynamically fetch the overview description
+async function showOverview(book) {
+    const modal = document.getElementById('book-modal');
+    const body = document.getElementById('modal-body');
     
-    document.getElementById('taskInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addTask();
-        }
-    });
-});
+    body.innerHTML = '<h3>Loading Overview...</h3>';
+    modal.style.display = 'block';
 
-// Add some demo tasks on first load
-if (!localStorage.getItem('cloudTasks')) {
-    tasks = [
-        { id: 1, text: 'Welcome to your cloud-deployed app! 🎉', completed: false, createdAt: new Date().toISOString() },
-        { id: 2, text: 'This app is running on Vercel servers', completed: false, createdAt: new Date().toISOString() },
-        { id: 3, text: 'Try adding your own tasks!', completed: false, createdAt: new Date().toISOString() }
-    ];
-    saveTasks();
-    renderTasks();
-    updateStats();
+    try {
+        const response = await fetch(`https://openlibrary.org${book.overview}.json`);
+        const data = await response.json();
+        const description = data.description || "No overview available for this title.";
+        
+        body.innerHTML = `
+            <h2>${book.title}</h2>
+            <h3>By ${book.author}</h3>
+            <p>${description}</p>
+        `;
+    } catch (error) {
+        body.innerHTML = '<h3>Could not load description.</h3>';
+    }
 }
+
+function closeModal() {
+    document.getElementById('book-modal').style.display = 'none';
+}
+
+function generateGenreSidebar() {
+    const list = document.getElementById('genre-list');
+    genres.forEach(genre => {
+        const li = document.createElement('li');
+        li.textContent = genre.charAt(0).toUpperCase() + genre.slice(1);
+        li.onclick = (e) => filterGenre(e, genre);
+        list.appendChild(li);
+    });
+    // Load the first genre by default
+    document.querySelector('#genre-list li').classList.add('active');
+    fetchBooksByGenre(genres[0]);
+}
+
+function filterGenre(event, genre) {
+    document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+    event.target.classList.add('active');
+    fetchBooksByGenre(genre);
+}
+
+function showLoading(isLoading) {
+    const loadingDiv = document.getElementById('loading');
+    const gridDiv = document.getElementById('book-grid');
+    if (isLoading) {
+        loadingDiv.style.display = 'block';
+        gridDiv.style.display = 'none';
+    } else {
+        loadingDiv.style.display = 'none';
+        gridDiv.style.display = 'grid';
+    }
+}
+
+// Initialize
+generateGenreSidebar();
